@@ -1,4 +1,4 @@
-from app.database import create_token, mongo_database
+from app.database import mongo_database
 
 
 class DatabaseMessage:
@@ -9,13 +9,13 @@ class DatabaseMessage:
         where_telegram_chat_id,
         telegram_message_id,
         from_album_id,
-        identifier=None,
+        creation_timestamp,
     ):
         self.where_telegram_chat_id = where_telegram_chat_id
         self.telegram_message_id = telegram_message_id
         self.from_album_id = from_album_id
-        self.downloaded = False
-        self.identifier = identifier or create_token(48)
+        self.creation_timestamp = creation_timestamp
+        self.was_downloaded = False
 
     def exists(self):
         query = {
@@ -35,8 +35,8 @@ class DatabaseMessage:
                     "where_telegram_chat_id": self.where_telegram_chat_id,
                     "telegram_message_id": self.telegram_message_id,
                     "from_album_id": self.from_album_id,
-                    "downloaded": self.downloaded,
-                    "identifier": self.identifier,
+                    "creation_timestamp": self.creation_timestamp,
+                    "was_downloaded": self.was_downloaded,
                 }
             )
 
@@ -50,8 +50,8 @@ class DatabaseMessage:
         self.where_telegram_chat_id = document["where_telegram_chat_id"]
         self.telegram_message_id = document["telegram_message_id"]
         self.from_album_id = document["from_album_id"]
-        self.downloaded = document["downloaded"]
-        self.identifier = document["identifier"]
+        self.creation_timestamp = document["creation_timestamp"]
+        self.was_downloaded = document["was_downloaded"]
 
     def delete(self):
         query = {"identifier": self.identifier}
@@ -70,14 +70,14 @@ def find_album_messages():
                         # Inclua outros campos relevantes que você precise
                     }
                 },
-                "count": {"$sum": 1}  # opcional, conta quantas mensagens por álbum
+                "count": {"$sum": 1},  # opcional, conta quantas mensagens por álbum
             }
         },
         {
             "$match": {
                 "_id": {"$ne": None}  # Exclui álbuns sem "from_album_id"
             }
-        }
+        },
     ]
 
-    return DatabaseMessage.mongo_collection.aggregate(pipeline) # albums
+    return DatabaseMessage.mongo_collection.aggregate(pipeline)  # albums
