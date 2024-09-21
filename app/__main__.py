@@ -16,7 +16,7 @@ async def process_messages(client: Client):
     """
     Função pra registrar todas as mensagens de um chat
     """
-    chat_id = settings.TARGET_CHAT_ID # Por enquanto fixo
+    chat_id = settings.SRC_CHAT_ID # Por enquanto fixo
     messages = client.get_chat_history(chat_id)
     total_messages = await client.search_messages_count(chat_id)
     counter = count()
