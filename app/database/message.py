@@ -16,15 +16,14 @@ class DatabaseMessage:
         self.from_album_hash = from_album_hash
         self.creation_timestamp = creation_timestamp
         self.was_downloaded = False
-
-    def exists(self):
-        query = {
+        self._default_query = {
             "where_telegram_chat_id": self.where_telegram_chat_id,
             "telegram_message_id": self.telegram_message_id,
             "from_album_hash": self.from_album_hash,
         }
-        message_document = self.mongo_collection.find_one(query)
-        return bool(message_document)
+
+    def exists(self):
+        return bool(self.mongo_collection.find_one(self._default_query))
 
     def create(self, duplicate=False):
         if not duplicate and self.exists():
@@ -41,12 +40,7 @@ class DatabaseMessage:
             )
 
     def refresh(self):
-        query = {
-            "where_telegram_chat_id": self.where_telegram_chat_id,
-            "telegram_message_id": self.telegram_message_id,
-            "from_album_hash": self.from_album_hash,
-        }
-        document = self.mongo_collection.find_one(query)
+        document = self.mongo_collection.find_one(self._default_query)
         self.where_telegram_chat_id = document["where_telegram_chat_id"]
         self.telegram_message_id = document["telegram_message_id"]
         self.from_album_hash = document["from_album_hash"]
@@ -54,8 +48,15 @@ class DatabaseMessage:
         self.was_downloaded = document["was_downloaded"]
 
     def delete(self):
-        query = {"identifier": self.identifier}
-        self.mongo_collection.delete_one(query)
+        self.mongo_collection.delete_one(self._default_query)
+
+    def set_downloaded_value(self, new_value: bool):
+        self.mongo_collection.update_one(
+            filter=self._default_query,
+            update={
+                "$set": {"was_downloaded": new_value},
+            },
+        )
 
 
 def find_album_messages():
@@ -67,15 +68,22 @@ def find_album_messages():
                     "$push": {
                         "telegram_message_id": "$telegram_message_id",
                         "where_telegram_chat_id": "$where_telegram_chat_id",
-                        # Inclua outros campos relevantes que você precise
+                        "from_album_hash": "$from_album_hash",
+                        "was_downloaded": "$was_downloaded",
                     }
                 },
-                "count": {"$sum": 1},  # opcional, conta quantas mensagens por álbum
+                "count": {"$sum": 1},
+                "first_creation_timestamp": {"$min": "$creation_timestamp"},
             }
         },
         {
             "$match": {
                 "_id": {"$ne": None}  # Exclui álbuns sem "from_album_hash"
+            }
+        },
+        {
+            "$sort": {
+                "first_creation_timestamp": 1  # 1 para ascendente, -1 para descendente
             }
         },
     ]
