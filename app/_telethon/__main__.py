@@ -1,13 +1,13 @@
 from loguru import logger
 
-from . import conversation_metadata_getter, media_getter, telegram_client
+from app._telethon import telegram_client
+from app._telethon import downloader
 
 
 async def routine():
     logger.info('Telegram client routine was started')
-    await media_getter.implement(telegram_client)
-    await conversation_metadata_getter.implement(telegram_client)
-    logger.info('Telegram client getters was implemented successfully')
+    await downloader.implement(telegram_client)
+    logger.info('Downloader module was implemented successfully')
     try:
         await telegram_client.run_until_disconnected()
     except KeyboardInterrupt:

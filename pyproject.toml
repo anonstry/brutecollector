@@ -26,9 +26,12 @@ classifiers = [
 ]
 dependencies = [
   "yarl",
+  "pydub",
   "loguru",
+  "tgcrypto",
   "dynaconf",
   "telethon",
+  "hydrogram",
 ]
 
 [project.urls]
