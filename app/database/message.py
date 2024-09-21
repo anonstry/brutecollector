@@ -60,6 +60,10 @@ class DatabaseMessage:
 
 
 def find_album_messages():
+    """
+    Retorna lista de mensagens com hashes em comum
+    Para arrumar: as datas estão vindo fora de ordem
+    """
     pipeline = [
         {
             "$group": {
@@ -82,8 +86,21 @@ def find_album_messages():
             }
         },
         {
+            "$addFields": {
+                "messages": {
+                    "$sortArray": {
+                        "input": "$messages",
+                        "sortBy": {
+                            "creation_timestamp": -1
+                        },  # 1 para ascendente, -1 para descendente
+                    }
+                }
+            }
+        },
+        {
             "$sort": {
-                "first_creation_timestamp": 1  # 1 para ascendente, -1 para descendente
+                "first_creation_timestamp": 1
+                # "first_creation_timestamp": -1  # 1 para ascendente, -1 para descendente
             }
         },
     ]

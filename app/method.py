@@ -17,6 +17,7 @@ from hydrogram.types.messages_and_media.video import Video
 async def download_thumbnail_file_id(client, message_media) -> str:
     return await client.download_media(message_media.thumbs[0], "/tmp/")
 
+
 async def download_message_media(_: Client, message: Message):
     return await message.download(in_memory=True)
 
