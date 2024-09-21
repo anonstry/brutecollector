@@ -1,5 +1,4 @@
-yarl
-pydub
+pymongo
 loguru
 tgcrypto
 dynaconf
