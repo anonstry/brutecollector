@@ -1,2 +1,3 @@
 [default]
 TELEGRAM_SESSION_NAME="brutecollector"
+TELEGRAM_APP_NAME="/tmp/brutecollector" # Alterável para o diretório temporário
