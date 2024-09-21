@@ -8,12 +8,12 @@ class DatabaseMessage:
         self,
         where_telegram_chat_id,
         telegram_message_id,
-        from_album_id,
+        from_album_hash,
         creation_timestamp,
     ):
         self.where_telegram_chat_id = where_telegram_chat_id
         self.telegram_message_id = telegram_message_id
-        self.from_album_id = from_album_id
+        self.from_album_hash = from_album_hash
         self.creation_timestamp = creation_timestamp
         self.was_downloaded = False
 
@@ -21,7 +21,7 @@ class DatabaseMessage:
         query = {
             "where_telegram_chat_id": self.where_telegram_chat_id,
             "telegram_message_id": self.telegram_message_id,
-            "from_album_id": self.from_album_id,
+            "from_album_hash": self.from_album_hash,
         }
         message_document = self.mongo_collection.find_one(query)
         return bool(message_document)
@@ -34,7 +34,7 @@ class DatabaseMessage:
                 {
                     "where_telegram_chat_id": self.where_telegram_chat_id,
                     "telegram_message_id": self.telegram_message_id,
-                    "from_album_id": self.from_album_id,
+                    "from_album_hash": self.from_album_hash,
                     "creation_timestamp": self.creation_timestamp,
                     "was_downloaded": self.was_downloaded,
                 }
@@ -44,12 +44,12 @@ class DatabaseMessage:
         query = {
             "where_telegram_chat_id": self.where_telegram_chat_id,
             "telegram_message_id": self.telegram_message_id,
-            "from_album_id": self.from_album_id,
+            "from_album_hash": self.from_album_hash,
         }
         document = self.mongo_collection.find_one(query)
         self.where_telegram_chat_id = document["where_telegram_chat_id"]
         self.telegram_message_id = document["telegram_message_id"]
-        self.from_album_id = document["from_album_id"]
+        self.from_album_hash = document["from_album_hash"]
         self.creation_timestamp = document["creation_timestamp"]
         self.was_downloaded = document["was_downloaded"]
 
@@ -62,7 +62,7 @@ def find_album_messages():
     pipeline = [
         {
             "$group": {
-                "_id": "$from_album_id",
+                "_id": "$from_album_hash",
                 "messages": {
                     "$push": {
                         "telegram_message_id": "$telegram_message_id",
@@ -75,7 +75,7 @@ def find_album_messages():
         },
         {
             "$match": {
-                "_id": {"$ne": None}  # Exclui álbuns sem "from_album_id"
+                "_id": {"$ne": None}  # Exclui álbuns sem "from_album_hash"
             }
         },
     ]

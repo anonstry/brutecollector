@@ -11,12 +11,18 @@ from app import method
 from dynaconf import settings
 from app.database.message import DatabaseMessage, find_album_messages
 
+from hashlib import sha256
+
+
+def encode(value):
+    return sha256(str(value).encode()).hexdigest()
+
 
 async def process_messages(client: Client):
     """
     Função pra registrar todas as mensagens de um chat
     """
-    chat_id = settings.SRC_CHAT_ID # Por enquanto fixo
+    chat_id = settings.SRC_CHAT_ID  # Por enquanto fixo
     messages = client.get_chat_history(chat_id)
     total_messages = await client.search_messages_count(chat_id)
     counter = count()
@@ -30,7 +36,8 @@ async def process_messages(client: Client):
         database_message = DatabaseMessage(
             where_telegram_chat_id=message.chat.id,
             telegram_message_id=message.id,
-            from_album_id=(message.media_group_id or message.id),
+            from_album_hash=encode(message.media_group_id or message.id),
+            creation_timestamp=message.date.timestamp(),
         )
         database_message.create()
         database_message.refresh()
@@ -43,7 +50,7 @@ async def download_media_group(documents):
         documents[0]["where_telegram_chat_id"],
         documents[0]["telegram_message_id"],
     )
-    
+
     media_group = []
     for document in documents:
         message = await client.get_messages(
@@ -68,18 +75,18 @@ async def handle_albums():
     for album in albums:
         print(album["count"])
         media_group = await download_media_group(album["messages"])
-        
+
         if album["count"] > 10:
             logger.critical("An album with more than 10 messages was found!")
-        
+
         await client.send_media_group(settings.DST_CHAT_ID, media=media_group)
 
 
 async def routine(client):
     await client.start()
     logger.info("Bot Telegram client started")
-    # await teste(client)
-    await handle_albums()
+    await process_messages(client)
+    # await handle_albums()
     # await idle()
     # await client.stop()
     logger.info("Bot Telegram client stopped")
