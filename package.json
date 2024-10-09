@@ -5,6 +5,9 @@
   },
   "dependencies": {
     "config": "^3.3.12",
+    "express": "^4.21.1",
+    "parse-url": "^9.2.0",
+    "prisma": "^5.20.0",
     "telegram": "^2.25.15"
   }
 }

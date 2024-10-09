@@ -1,16 +1,18 @@
-import * as readline from "readline";
 import * as fs from "fs";
+import * as readline from "readline";
 import { Api, TelegramClient } from "telegram";
 // import { CustomFile } from "telegram/client/uploads";
 import { NewMessage, NewMessageEvent } from "telegram/events";
 import { StringSession } from "telegram/sessions";
 // const { events } = require("telegram");
 
+const parseUrl = require("parse-url");
 const config = require("config");
 
 const apiId = config.get("TELEGRAM_API_ID");
 const apiHash = config.get("TELEGRAM_API_HASH");
 const stringSession = new StringSession(config.get("TELEGRAM_SESSION_STRING"));
+// console.log(config.util.getEnv("TEST"));
 
 const terminal = readline.createInterface({
   input: process.stdin,
@@ -51,33 +53,28 @@ async function saveMedia(client: TelegramClient, message: Api.Message) {
   fs.unlinkSync(downloadedFile);
 }
 
-async function startClient() {
-  console.log("Loading interactive example...");
-  const client = new TelegramClient(stringSession, apiId, apiHash, {
-    connectionRetries: 5,
-  });
-  await client.start({
-    phoneNumber: async () =>
-      new Promise((resolve) =>
-        terminal.question("Please enter your number: ", resolve)
-  ),
-  password: async () =>
-    new Promise((resolve) =>
-      terminal.question("Please enter your password: ", resolve)
-),
-phoneCode: async () =>
-  new Promise((resolve) =>
-    terminal.question("Please enter the code you received: ", resolve)
-),
-onError: (err) => console.log(err),
-});
-await client.connect();
-console.log("You should now be connected.");
-return client;
+async function parseLink(string: string) {
+  console.log(string);
+  // privateChatLink = /^.*c\/{}/i
+  const parsedLink = parseUrl(string);
+  if (parsedLink.pathname.startsWith("/c/")) {
+    const location = parsedLink.pathname.replace("/c/", "-100");
+    const fromChat = Number(location.split("/")[0]);
+    const messageId = Number(location.split("/")[1]);
+    return { fromChat: fromChat, messageId: messageId };
+  } else {
+    const location = parsedLink.pathname.replace("/", "", 1); // Replace the first ocorrency
+    console.log(location);
+    const fromChat = location.split("/")[0];
+    const messageId = Number(location.split("/")[1]);
+    return { fromChat: fromChat, messageId: messageId };
+  }
 }
 
 async function mediaDownloader(event: NewMessageEvent) {
-  const command = /(\.|\!)?(hmm|eita|baixando|carregando|download)/i;
+  const downloadMediaCommand =
+    /(\.|\!)?(hmm|eita|baixando|carregando|download)/i; // Download media from reply
+  const parseLinkCommand = /((\.|\!)?(collect|save))/i; // Download media from link
   const message = event.message;
   if (
     event.isPrivate &&
@@ -86,7 +83,11 @@ async function mediaDownloader(event: NewMessageEvent) {
   ) {
     console.info("Event triggered: New expirable media arrived");
     await saveMedia(event.client, event.message);
-  } else if (message.replyTo && message.out && message.rawText.match(command)) {
+  } else if (
+    message.replyTo &&
+    message.out &&
+    message.rawText.match(downloadMediaCommand)
+  ) {
     console.info("Event triggered: Media manual download");
     const downloadableMessage = await getMessage(
       event.client,
@@ -94,15 +95,51 @@ async function mediaDownloader(event: NewMessageEvent) {
       message.replyToMsgId.valueOf()
     );
     if (downloadableMessage.media) {
-      saveMedia(event.client, downloadableMessage);
+      await saveMedia(event.client, downloadableMessage);
       await message.delete(); // Delete the command after
     } else {
       console.error("There is no media to download on that message");
     }
+  } else if (message.rawText.match(parseLinkCommand)) {
+    console.log("Message from link");
+    const link = message.rawText.split(" ", 2)[1];
+    const parsedLink = await parseLink(link);
+    console.log(parsedLink);
+    const fromChat = parsedLink["fromChat"];
+    const messageId = parsedLink["messageId"];
+    console.log(parsedLink);
+    await saveMedia(
+      event.client,
+      await getMessage(event.client, fromChat, messageId)
+    );
   }
 }
 
-(async () => {
-  const client = await startClient();
+async function startTelegramClient() {
+  console.log("Loading interactive example...");
+  const client = new TelegramClient(stringSession, apiId, apiHash, {
+    connectionRetries: 5,
+  });
+  await client.start({
+    phoneNumber: async () =>
+      new Promise((resolve) =>
+        terminal.question("Please enter your number: ", resolve)
+      ),
+    password: async () =>
+      new Promise((resolve) =>
+        terminal.question("Please enter your password: ", resolve)
+      ),
+    phoneCode: async () =>
+      new Promise((resolve) =>
+        terminal.question("Please enter the code you received: ", resolve)
+      ),
+    onError: (err) => console.log(err),
+  });
+  await client.connect();
+  console.log("You should now be connected.");
   client.addEventHandler(mediaDownloader, new NewMessage({}));
+}
+
+(async () => {
+  startTelegramClient();
 })();
