@@ -1,6 +1,0 @@
-pymongo
-loguru
-tgcrypto
-dynaconf
-telethon
-hydrogram
