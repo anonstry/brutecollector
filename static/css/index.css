@@ -1,0 +1,10 @@
+* {
+    background-color: #1f1e23;
+    /* background-color: #1a1a1a; */
+    color: white;
+    font-family: monospace;
+}
+
+#main-header {
+    font-size: 2.25em;
+}

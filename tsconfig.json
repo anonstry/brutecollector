@@ -2,17 +2,29 @@
   "compilerOptions": {
     "target": "ES6",
     // "module": "system",
-    "module" : "commonjs",
+    "module": "CommonJS",        // Usar módulos CommonJS, adequados para Node.js
+    // "module": "es2022",
     "moduleResolution": "node",
     "sourceMap": false,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "removeComments": false,
+    "removeComments": true,
     "noImplicitAny": false,
+    "outDir": "./dist",          // Saída dos arquivos compilados irá para 'dist'
+    "rootDir": "./",             // O diretório raiz dos arquivos TypeScript
+    // "strict": true,              // Habilita verificações mais rigorosas de tipagem
+    "esModuleInterop": true,      // Permite interoperabilidade com ES6 modules
     "types": ["node"],
   },
+  // "ts-node": {
+  //   "esm": true
+  // },
+  "include": [
+    "static/**/*.ts",            // Compilar os arquivos TypeScript do frontend
+    "server.ts"                  // Compilar o servidor TypeScript
+  ],
   "exclude": [
-    "node_modules",
+    "node_modules1",
     ".npm"
   ]
 }
