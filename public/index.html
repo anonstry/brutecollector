@@ -3,29 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="/public/images/tassistant.ico">
+    <link rel="icon" href="/images/tassistant.ico">
     <link rel="stylesheet" href="/static/css/index.css">
     <title>Tassistant</title>
 </head>
 <body>
-     <h1 id="main-header">Tassistant@brutecollector</h1>
-    <input type="text" id="userInput" placeholder="Digite algo" onkeydown="if (event.key === 'Enter') submitText()">
+    <h1 id="main-header">Tassistant@brutecollector</h1>
+    <input type="text" id="usernameInput" placeholder="Digite um username" onkeydown="if (event.key === 'Enter') submitText()">
     <button onclick="submitText()">Enviar</button>
 
-    <p id="telegram-profile-search-result">Result placeholder</p>
+    <p id="telegram-profile-search-result">Insira um username acima</p>
 
     <div>
-        <input id="linkInput" type="text" placeholder="Link" onkeydown="if (event.key === 'Enter') submitTelegramLink()" />
+        <input id="linkInput" type="text" placeholder="Link para fazer download" onkeydown="if (event.key === 'Enter') submitTelegramLink()" />
         <!-- <input id="chatEntityInput" type="text" placeholder="Chat Entity" onkeydown="if (event.key === 'Enter') submitText()" />
         <input id="messageIdInput" type="text" placeholder="Message Id" onkeydown="if (event.key === 'Enter') submitText()" /> -->
         <button onclick="submitTelegramLink()">Enviar</button>
         <p id="telegram-message-downloader-status">Telegram media donwloader status placeholder</p>
     </div>
-
-    <script>
-        
-
-    </script>
 
     <script src="/static/app.js"></script>
 </body>
