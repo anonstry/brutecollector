@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "strict": true,
     "target": "ES6",
     // "module": "system",
     "module": "CommonJS",        // Usar módulos CommonJS, adequados para Node.js

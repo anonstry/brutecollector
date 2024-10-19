@@ -1,19 +1,11 @@
-import * as fs from "fs";
-import * as os from "os";
-
+import os from "os";
+import fs from "fs";
+import fsPromises from "fs/promises";
+import path from "path";
+import ffmpeg from "fluent-ffmpeg";
+import parseUrl from "parse-url";
 import { Api, TelegramClient } from "telegram";
 import { NewMessageEvent } from "telegram/events";
-import { CustomFile } from "telegram/client/uploads";
-import { generateRandomBigInt } from "telegram/Helpers";
-import { Stats, statSync } from "node:fs";
-
-import mime from "mime-types";
-import path from "path";
-// import parseUrl from "parse-url";
-import ffmpeg from "fluent-ffmpeg";
-import { getAttributes } from "telegram/Utils";
-
-const parseUrl = require("parse-url");
 
 function* range(start: number, end: number, step = 1): Generator<number> {
   if (end === undefined) [end, start] = [start, 0];
@@ -44,17 +36,22 @@ function generateFileThumbnail(filePath: string) {
 }
 
 async function getGallery(client: TelegramClient, albumMessage: Api.Message) {
-  const messages = await client.getMessages(albumMessage.chatId, {
-    ids: Array.from(range(albumMessage.id - 10, albumMessage.id + 10)),
-  });
-  const filteredMessages = messages.filter(
-    (message) =>
-      message &&
-      message.media &&
-      message.groupedId &&
-      message.groupedId.valueOf() == albumMessage.groupedId.valueOf()
-  );
-  return filteredMessages;
+  let messages: Api.Message[] = [];
+  for await (const message of client.iterMessages(albumMessage.chatId, {
+    maxId: albumMessage.id + 9,
+    minId: albumMessage.id - 9,
+    reverse: true
+  })) {
+    if (
+      message.groupedId !== null
+      && message.groupedId !== undefined
+      && albumMessage.groupedId !== null
+      && albumMessage.groupedId !== undefined
+      && message.groupedId.compare(albumMessage.groupedId) === 0) {
+      messages.push(message)
+    }
+  }
+  return messages;
 }
 
 export async function getMessage(
@@ -65,153 +62,129 @@ export async function getMessage(
   const messages = await client.getMessages(fromChatId, {
     ids: messageId,
   });
+
   const firstMessage = messages[0];
-  // console.log();
   return firstMessage;
 }
 
 async function saveAlbumMedia(
   client: TelegramClient,
-  messages: Array<Api.Message>
+  messages: Api.Message[]
 ) {
-  const media = [];
-  const downloadedFiles = [];
-  for (const message of messages) {
-    const downloadedFile = (await client.downloadMedia(message.media, {
-      outputFile: os.tmpdir(),
-    })) as string;
-    downloadedFiles.push(downloadedFile);
-    //   const uploadedDonwloadedFile = await client.uploadFile({
-    //     file: new CustomFile(
-    //       path.parse(downloadedFile).name,
-    //       statSync(downloadedFile).size,
-    //       downloadedFile
-    //     ),
-    //     workers: 4,
-    //   });
-    //   const inputMediaUploadedDocument: Api.TypeInputMedia =
-    //     new Api.InputMediaUploadedDocument({
-    //       file: uploadedDonwloadedFile,
-    //       mimeType: mime.lookup(path.parse(downloadedFile).ext),
-    //       attributes: []
-    //     });
-    //   const inputSingleMedia = new Api.InputSingleMedia({
-    //     media: inputMediaUploadedDocument,
-    //     message: message.message || "",
-    //     randomId: generateRandomBigInt(),
-    //   });
-    //   // console.log(inputSingleMedia.media); // True
-    //   media.push(inputSingleMedia); //
-    // }
-    // await client.sendFile("me", { file: media });
-    // await client.invoke(
-    //   new Api.messages.SendMultiMedia({
-    //     // silent: true,
-    //     // background: true,
-    //     // clearDraft: true,
-    //     peer: "me",
-    //     multiMedia: media,
-    //   })
-    // );
+  const downloadedFiles: string[] = [];
 
-    // const uploadedDonwloadedFile = await client.uploadFile({
-    //   file: new CustomFile(
-    //     path.parse(firstDownloadedFile).name,
-    //     statSync(firstDownloadedFile).size,
-    //     firstDownloadedFile
-    //   ),
-    //   workers: 1,
-    // });
-    // const inputMediaUploadedDocument: Api.TypeInputMedia = new Api.InputMediaUploadedDocument({
-    //   file: uploadedDonwloadedFile,
-    //   mimeType: mime.lookup(path.parse(firstDownloadedFile).ext),
-    //   attributes: [],
-    // });
-    // console.log(inputMediaUploadedDocument);
-    // const inputSingleMedia = new Api.InputSingleMedia({message: "", media: inputMediaUploadedDocument})
-    // await client.invoke(new Api.messages.SendMultiMedia({
-    //   silent: true,
-    //   background: true,
-    //   clearDraft: true,
-    //   peer: "me",
-    //   multiMedia: [inputSingleMedia, inputSingleMedia]
-    // }))
-    // const inputDocument = new Api.InputMediaDocument(2)
-    // const inputFiles = new Api.InputSingleMedia()
-    // Api.
-    // console.log("Message album downloaded sucessfully");\|
-  }
-    const newMessages = client.sendFile("me", {
-      file: downloadedFiles,
-      // thumb: downloadedFiles.map(
-      //   (downloadedFile) => generateFileThumbnail(downloadedFile) as)
-      // ),
-      caption: messages.map((message) => message.rawText),
-      formattingEntities: messages.map((message) => message.getEntitiesText()),
-    });
-    try {
-      await client.editMessage(newMessages[0].chatId, {
-        message: newMessages[0].id,
-        text: messages[0].rawText,
-        formattingEntities: messages[0].entities,
-      });
-    } catch {
-      console.debug("Message not modified");
+  let caption: string | undefined;
+  let entities: Api.TypeMessageEntity[] | undefined
+  for (const message of messages) {
+    if (message.media == undefined) {
+      continue
     }
-    // for (const downloadedFile of downloadedFiles) {
-    //   fs.unlinkSync(downloadedFile);
-    // }
-    console.log("Sent!");
+    
+    console.log(`Downloading ${message.id}`)
+
+    const outputFilepath = await client.downloadMedia(message.media, {
+      outputFile: os.tmpdir(),
+    })
+    
+    if (typeof outputFilepath == "string" && fs.existsSync(outputFilepath)) {
+      downloadedFiles.push(outputFilepath);
+    } else {
+      console.log("Error", outputFilepath)
+      return
+    }
+
+    if (message.message) {
+      caption = message.message
+    }
+
+    if (message.entities) {
+      entities = message.entities
+    }
+  }
+
+  console.log(`Sending: ${downloadedFiles.join(", ")}`)
+
+  await client.sendFile("me", {
+    file: downloadedFiles,
+    formattingEntities: entities,
+    caption
+  })
+  
+  console.log("Sent!");
+  
+  // cleanup
+  for (const downloadedFile of downloadedFiles) {
+    if (fs.existsSync(downloadedFile)) {
+      await fsPromises.rm(downloadedFile);
+    }
+  }
 }
 
 export async function saveMedia(client: TelegramClient, message: Api.Message) {
-  // const downloadedGallery = saveAlbumMedia(client, [message]);
-  // return; // Depois mover isso para outro lugar
-  if (message.groupedId) {
+  if (message.media == undefined) {
+    console.error(`Message ${message.id} doesn't contain any media`);
+    return;
+  }
+
+  if (message.groupedId !== null) {
     const gallery = await getGallery(client, message);
-    const downloadedGallery = saveAlbumMedia(client, gallery);
+    await saveAlbumMedia(client, gallery);
     return; // Depois mover isso para outro lugar
   }
+
   // Talvez possa ser melhorado com um arquivo temporário
   // console.log(message.file);
   // console.log(message.file.title);
   // console.log(message.media);
   // const buffer = (await client.downloadMedia(message.media, {})) as Buffer;
+
+  console.log("Downloading...")
   const downloadedFile = await client.downloadMedia(message.media, {
-    outputFile: "/tmp/",
+    outputFile: os.tmpdir()
   });
+
   console.info("Message media was downloaded");
-  // console.info(buffer);
-  // const filename: string = `document-from-${message.senderId}`;
-  await client.sendFile("me", {
-    file: downloadedFile,
-    // file: new CustomFile(filename, Buffer.byteLength(buffer), "", buffer),
-    caption: message.rawText,
-    formattingEntities: message.entities,
-  });
-  fs.unlinkSync(downloadedFile);
+  if (typeof downloadedFile == "string" && fs.existsSync(downloadedFile)) {
+    // const filename: string = `document-from-${message.senderId}`;
+    await client.sendFile("me", {
+      file: downloadedFile,
+      // file: new CustomFile(filename, Buffer.byteLength(buffer), "", buffer),
+      caption: message.rawText,
+      formattingEntities: message.entities,
+    });
+
+    await fsPromises.rm(downloadedFile);
+  }
 }
 
-export async function parseLink(string: string) {
-  console.log(string);
+export type parseLinkResponse =  {
+  fromChat: number;
+  messageId: number;
+}
+
+export async function parseLink(string: string): Promise<parseLinkResponse> {
   // privateChatLink = /^.*c\/{}/i
   // Remove singlez
   // fromChatEntity, fromTopic, messageId
   const parsedLink = parseUrl(string);
   if (parsedLink.pathname.startsWith("/c/")) {
     const location = parsedLink.pathname.replace("/c/", "-100");
-    const fromChat = Number(location.split("/")[0]);
-    const messageId = Number(location.split("/")[1]);
+    const fromChat = parseInt(location.split("/")[0]);
+    const messageId = parseInt(location.split("/")[1]);
     return { fromChat: fromChat, messageId: messageId };
   } else {
-    const location = parsedLink.pathname.replace("/", "", 1); // Replace the first ocorrency
-    const fromChat: number | string = location.split("/")[0];
-    const messageId = Number(location.split("/")[1]);
+    const location = parsedLink.pathname.replace("/", ""); // Replace the first ocorrency
+    const fromChat = parseInt(location.split("/")[0]);
+    const messageId = parseInt(location.split("/")[1]);
     return { fromChat: fromChat, messageId: messageId };
   }
 }
 
 export async function mediaDownloader(event: NewMessageEvent) {
+  if (event.client == undefined) {
+    return
+  }
+
   const downloadMediaCommand =
     /(\.|\!)?(hmm|eita|baixando|carregando|download)/i; // Download media from reply
   const parseLinkCommand = /((\.|\!)?(collect|save))/i; // Download media from link
@@ -229,16 +202,25 @@ export async function mediaDownloader(event: NewMessageEvent) {
     message.rawText.match(downloadMediaCommand)
   ) {
     console.info("Event triggered: Media manual download");
+    const chatId = message.chatId;
+    const replyToMsgId = message.replyToMsgId;
+
+    if (chatId == undefined || replyToMsgId == undefined) {
+      return;
+    }
+
     const downloadableMessage = await getMessage(
       event.client,
-      message.chatId.valueOf(),
-      message.replyToMsgId.valueOf()
+      chatId.valueOf(),
+      replyToMsgId.valueOf()
     );
+
     if (downloadableMessage.media) {
       await saveMedia(event.client, downloadableMessage);
     } else {
       console.error("There is no media to download on that message");
     }
+
     await message.delete({ revoke: true });
     // } else if (message.out && message.rawText.match(parseLinkCommand)) {
     //   console.log("Message from link");
@@ -273,9 +255,12 @@ export async function getActiveUserStories(client: TelegramClient, userEntity) {
     const downloadedStoryFile = await client.downloadMedia(story["media"], {
       outputFile: os.tmpdir(),
     });
-    await client.sendFile("me", {
-      file: downloadedStoryFile,
-      caption: story["caption"],
-    });
+    
+    if (typeof downloadedStoryFile == "string" && fs.existsSync(downloadedStoryFile)) {
+      await client.sendFile("me", {
+        file: downloadedStoryFile,
+        caption: story["caption"],
+      });
+    }
   }
 }
